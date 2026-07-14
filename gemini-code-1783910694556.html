@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Escape Room: 동명사 미스터리 하우스 ⚡</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --bg: #090d16;
+            --card-bg: #111827;
+            --text: #f3f4f6;
+            --text-muted: #6b7280;
+            --success: #10b981;
+            --error: #ef4444;
+            --accent: #f59e0b;
+            --room-color: #f59e0b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; position: relative; background-image: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #090d16 100%); }
+        
+        header { text-align: center; margin-bottom: 20px; width: 100%; max-width: 650px; }
+        header h1 { font-size: 28px; color: var(--accent); margin-bottom: 8px; text-shadow: 0 0 15px rgba(245, 158, 11, 0.6); letter-spacing: 2px; }
+        
+        .stage-map { display: none; justify-content: space-between; width: 100%; max-width: 650px; margin-bottom: 20px; background: rgba(15, 23, 42, 0.6); padding: 10px; border-radius: 12px; border: 1px solid #1f2937; gap: 5px; backdrop-filter: blur(5px); }
+        .stage-dot { flex: 1; text-align: center; font-size: 11px; padding: 6px 2px; color: var(--text-muted); border-bottom: 3px solid #374151; transition: all 0.3s; white-space: nowrap; }
+        .stage-dot.active { color: var(--accent); border-color: var(--accent); font-weight: bold; text-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
+        .stage-dot.cleared { color: var(--success); border-color: var(--success); }
+
+        /* 화면 공통 컨테이너 */
+        .screen-container { background: var(--card-bg); border-radius: 16px; padding: 25px; width: 100%; max-width: 650px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); border: 1px solid #1f2937; position: relative; transition: all 0.5s ease; }
+        
+        /* 👁️ 방별 호러 그래픽 그래픽 존 */
+        .room-visual-zone { width: 100%; height: 120px; background: #0b0f19; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; border: 1px solid #1f2937; position: relative; overflow: hidden; }
+        .room-visual-zone::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%); }
+        
+        /* 인트로 화면 전용 스타일 */
+        .intro-screen { text-align: center; padding: 20px 10px; }
+        .intro-title { font-size: 28px; color: var(--accent); font-weight: bold; margin-bottom: 15px; text-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
+        .intro-desc { color: #9ca3af; font-size: 15px; line-height: 1.6; margin-bottom: 30px; }
+
+        .room-title { font-size: 15px; color: var(--room-color); font-weight: bold; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; display: flex; align-items: center; gap: 8px; transition: color 0.3s; }
+        .question-num { font-size: 13px; color: var(--text-muted); margin-bottom: 15px; }
+        .question-text { font-size: 18px; font-weight: bold; margin-bottom: 20px; line-height: 1.6; white-space: pre-wrap; }
+        
+        .options-container { display: flex; flex-direction: column; gap: 12px; }
+        .option-btn { background: #1f2937; border: 2px solid #374151; padding: 15px; border-radius: 10px; text-align: left; font-size: 16px; color: var(--text); cursor: pointer; transition: all 0.2s; font-weight: 500; }
+        .option-btn:hover { border-color: var(--primary); background: #2563eb; box-shadow: 0 0 10px rgba(37, 99, 235, 0.4); }
+        .option-btn.correct { background-color: #064e3b !important; border-color: var(--success) !important; color: #a7f3d0 !important; }
+        .option-btn.incorrect { background-color: #7f1d1d !important; border-color: var(--error) !important; color: #fca5a5 !important; }
+
+        .input-container { display: flex; flex-direction: column; gap: 12px; }
+        .text-input { width: 100%; padding: 15px; border: 2px solid #374151; border-radius: 10px; font-size: 16px; font-weight: bold; text-align: center; background: #0b0f19; color: white; }
+        .text-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
+
+        .explanation-box { margin-top: 20px; padding: 15px; border-radius: 10px; display: none; line-height: 1.6; background: #0b0f19; border-left: 4px solid var(--primary); }
+        .explanation-box.correct { border-left-color: var(--success); }
+        .explanation-box.incorrect { border-left-color: var(--error); animation: shake 0.4s ease-in-out; }
+        .explanation-title { font-weight: bold; margin-bottom: 5px; font-size: 15px; }
+        .explanation-text { font-size: 14px; color: #9ca3af; }
+
+        .sad-illustration { font-size: 28px; text-align: center; margin-bottom: 10px; color: #fca5a5; font-weight: bold; animation: blink 1s infinite alternate; }
+
+        .nav-container { margin-top: 25px; display: flex; justify-content: flex-end; width: 100%; max-width: 650px; }
+        .btn { background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; display: none; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4); transition: all 0.2s; }
+        .btn:hover { background: #4f46e5; transform: translateY(-1px); }
+        .btn.escape-btn { background: var(--accent); color: #000; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4); }
+        .btn.escape-btn:hover { background: #d97706; }
+
+        .result-screen, .teacher-dashboard { display: none; }
+        .result-title { font-size: 30px; color: var(--accent); font-weight: bold; margin-bottom: 15px; text-align: center; text-shadow: 0 0 15px rgba(245, 158, 11, 0.5); }
+        
+        .rank-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #0b0f19; border-radius: 8px; overflow: hidden; }
+        .rank-table th, .rank-table td { padding: 12px; text-align: center; border-bottom: 1px solid #1f2937; }
+        .rank-table th { background: #1e1b4b; color: var(--accent); font-weight: bold; }
+        .rank-table tr:hover { background: #111827; }
+
+        .confetti { position: absolute; width: 8px; height: 8px; border-radius: 50%; z-index: 10; pointer-events: none; animation: fly 1s ease-out forwards; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        @keyframes fly {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--x), var(--y)) scale(0.5); opacity: 0; }
+        }
+        @keyframes blink {
+            0% { opacity: 0.4; text-shadow: 0 0 5px rgba(239, 68, 68, 0.2); }
+            100% { opacity: 1; text-shadow: 0 0 15px rgba(239, 68, 68, 0.8); }
+        }
+        @keyframes pulse-light {
+            0% { box-shadow: inset 0 0 15px rgba(0,0,0,0.8); }
+            100% { box-shadow: inset 0 0 30px rgba(245, 158, 11, 0.2); }
+        }
+
+        .room-clear-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 10, 0.95); z-index: 100; justify-content: center; align-items: center; flex-direction: column; text-align: center; color: var(--accent); }
+        .overlay-title { font-size: 36px; font-weight: bold; margin-bottom: 20px; animation: pulse 1s infinite alternate; }
+        .overlay-desc { font-size: 18px; color: var(--text); max-width: 80%; line-height: 1.6; margin-bottom: 20px; }
+
+        @keyframes pulse {
+            0% { transform: scale(1); text-shadow: 0 0 10px var(--accent); }
+            100% { transform: scale(1.05); text-shadow: 0 0 25px var(--accent); }
+        }
+        .admin-toggle-btn { background: none; border: 1px solid #374151; color: var(--text-muted); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; margin-top: 20px; }
+        .admin-toggle-btn:hover { color: white; border-color: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🔑 ESCAPE ROOM 🔑</h1>
+        <p style="color: var(--text-muted); font-size: 14px; margin-top: 5px;">동명사의 비밀을 풀고 미스터리 하우스를 탈출하라!</p>
+    </header>
+
+    <!-- 5대 테마 방 진행 지도 -->
+    <div class="stage-map" id="stageMap">
+        <div class="stage-dot active" id="dot0">R1. 시작의 방</div>
+        <div class="stage-dot" id="dot1">R2. 전치사의 감옥</div>
+        <div class="stage-dot" id="dot2">R3. 분사의 미로</div>
+        <div class="stage-dot" id="dot3">R4. 관용구의 비밀방</div>
+        <div class="stage-dot" id="dot4">R5. 마스터의 시련</div>
+    </div>
+
+    <!-- 🚪 1단계: 인트로 화면 (스릴 넘치는 하우스 외관 그래픽 포함) -->
+    <div class="screen-container" id="introScreen">
+        <div class="intro-screen">
+            <div class="room-visual-zone" style="height: 140px;">
+                <!-- 🏰 유령의 집 거미줄 SVG 그래픽 -->
+                <svg width="100" height="100" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 8px #f59e0b);">
+                    <path d="M10,10 L90,90 M90,10 L10,90 M50,10 L50,90 M10,50 L90,50" stroke="#4b5563" stroke-width="1"/>
+                    <path d="M30,30 Q50,40 70,30 Q60,50 70,70 Q50,60 30,70 Q40,50 30,30 Z" fill="none" stroke="#f59e0b" stroke-width="2"/>
+                    <path d="M20,20 Q50,32 80,20 Q68,50 80,80 Q50,68 20,80 Q32,50 20,20 Z" fill="none" stroke="#d97706" stroke-width="1.5"/>
+                    <circle cx="50" cy="50" r="4" fill="#ef4444"/>
+                </svg>
+            </div>
+            <div class="intro-title"> Castle of Gerund : 미스터리 하우스</div>
+            <div class="intro-desc">
+                동명사의 저주가 깃든 컴컴한 서재와 지하 감옥에 갇혔습니다.<br>
+                자물쇠의 문법 암호를 해독해야만 살아서 이곳을 빠져나갈 수 있습니다.<br>
+                <span style="color: #f87171; font-weight: bold;">주의: 잘못된 암호를 넣으면 함정이 작동합니다.</span>
+            </div>
+            <div style="max-width: 400px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px;">
+                <input type="text" id="startStudentInfo" class="text-input" placeholder="학번 이름을 입력하세요 (예: 30101 홍길동)">
+                <button class="btn" style="display: block; width: 100%; background: var(--accent); color: #000; padding: 15px; font-size: 18px;" onclick="startGame()">🏰 조사 착수 (진입)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🕹️ 2단계: 메인 퀴즈 인터페이스 (실시간 변화하는 스릴 그래픽 창 탑재) -->
+    <div class="screen-container" id="quizContainer" style="display: none;">
+        <!-- 👁️ 방 상태에 맞춰 실시간으로 그림이 변하는 그래픽 보드 -->
+        <div class="room-visual-zone" id="roomVisualContainer" style="animation: pulse-light 2s infinite alternate;">
+            <div id="roomGraphicContent"></div>
+        </div>
+
+        <div class="room-title" id="roomTitle">ROOM 1. 시작의 방</div>
+        <div class="question-num" id="questionNumText">자물쇠 해제 현황: 1 / 5</div>
+        <div class="question-text" id="questionText">질문 내용</div>
+        
+        <div id="interactionArea"></div>
+
+        <div class="explanation-box" id="explanationBox">
+            <div id="sadIllustration" class="sad-illustration" style="display:none;">⚠️ 함정 발동! 날카로운 해골 창이 솟아올랐습니다!</div>
+            <div class="explanation-title" id="expTitle">결과</div>
+            <div class="explanation-text" id="expText">해설 내용</div>
+        </div>
+    </div>
+
+    <div class="nav-container">
+        <button class="btn" id="nextBtn" onclick="nextQuestion()">다음 암호 풀기 ➡️</button>
+    </div>
+
+    <!-- 방 클리어 연출 오버레이 (방 돌파 그래픽 포함) -->
+    <div class="room-clear-overlay" id="clearOverlay">
+        <div style="font-size: 60px; margin-bottom: 10px; filter: drop-shadow(0 0 10px #10b981);">🔓</div>
+        <div class="overlay-title" id="overlayTitle">ROOM CLEARED!</div>
+        <div class="overlay-desc" id="overlayDesc">다음 방의 육중한 철문이 열리는 소리가 들립니다...</div>
+        <button class="btn" style="display:inline-block; margin-top: 20px; background: var(--accent); color:#000;" onclick="closeOverlay()">다음 방 진입하기 🚪</button>
+    </div>
+
+    <!-- 🏆 3단계: 최종 탈출 성공 화면 (보물상자 그래픽) -->
+    <div class="screen-container result-screen" id="resultScreen">
+        <div class="result-title">🏰 HOUSE ESCAPED! 🏰</div>
+        <div class="room-visual-zone" style="height: 130px; background: #070a12;">
+            <!-- 👑 황금 보물상자 SVG 그래픽 -->
+            <svg width="100" height="100" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 15px #ffd700);">
+                <path d="M20,50 L80,50 L80,80 L20,80 Z" fill="#b45309" stroke="#f59e0b" stroke-width="2"/>
+                <path d="M20,50 Q50,20 80,50 Z" fill="#d97706" stroke="#ffd700" stroke-width="2"/>
+                <rect x="45" y="45" width="10" height="15" rx="3" fill="#f59e0b" stroke="#ffd700"/>
+                <circle cx="50" cy="52" r="2" fill="#000"/>
+                <path d="M10,35 L25,20 M90,35 L75,20 M50,15 L50,5" stroke="#ffd700" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+        </div>
+        <div id="scoreText" style="font-size: 18px; line-height: 1.8; margin-bottom: 30px; text-align: center;">점수 계산 중...</div>
+        
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button class="btn" id="retryWrongBtn" style="display:inline-block; background:#ef4444;" onclick="startWrongQuestions()">함정(오답) 재탈출하기 🔄</button>
+            <button class="btn" style="display:inline-block;" onclick="restartFullQuiz()">새로운 플레이어 도전 🔁</button>
+        </div>
+    </div>
+
+    <!-- 📊 4단계: 교사 전용 실시간 순위표 대시보드 -->
+    <div class="screen-container teacher-dashboard" id="teacherDashboard">
+        <div class="result-title" style="color: var(--success);">📊 실시간 랭킹 대시보드 (교사 화면)</div>
+        <p style="color: var(--text-muted); font-size: 13px; text-align: center; margin-bottom: 15px;">학생들이 등록한 최종 성적과 탈출 소요 시간이 실시간 동기화되어 정렬됩니다.</p>
+        
+        <table class="rank-table">
+            <thead>
+                <tr>
+                    <th>순위</th>
+                    <th>학번/이름</th>
+                    <th>성공률 (개수)</th>
+                    <th>탈출 시간</th>
+                </tr>
+            </thead>
+            <tbody id="rankTableBody">
+                <tr>
+                    <td colspan="4" style="color: var(--text-muted);">등록된 탈출 기록이 없습니다.</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn" style="display: inline-block; background: #374151; font-size: 13px; padding: 8px 16px;" onclick="clearLeaderboard()">순위표 초기화 🗑️</button>
+            <button class="btn" style="display: inline-block; font-size: 13px; padding: 8px 16px;" onclick="closeDashboard()">대시보드 닫기 ❌</button>
+        </div>
+    </div>
+
+    <button class="admin-toggle-btn" onclick="tryAccessDashboard()">📋 교사 전용 순위 대시보드 전환 (Password)</button>
+
+    <script>
+        // 방별 고유 그래픽 소스 매핑 데이터베이스 (외부 연결 없이 순수 스크립트 렌더링)
+        const roomGraphics = [
+            // ROOM 1: 낡은 고서와 촛대 (시작의 방)
+            `<svg width="80" height="80" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px #f59e0b);">
+                <path d="M20,70 Q50,60 80,70 L80,30 Q50,20 20,30 Z" fill="#374151" stroke="#4b5563" stroke-width="2"/>
+                <path d="M50,25 L50,65" stroke="#1f2937" stroke-width="2"/>
+                <path d="M25,33 Q50,25 75,33" stroke="#9ca3af" stroke-width="1" fill="none"/>
+                <rect x="47" y="65" width="6" height="12" fill="#d1d5db"/>
+                <path d="M50,65 Q50,55 53,52" fill="#ef4444"/>
+             </svg>`,
+            // ROOM 2: 철창과 쇠사슬 (전치사의 감옥)
+            `<svg width="80" height="80" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px #ef4444);">
+                <rect x="15" y="15" width="70" height="70" fill="none" stroke="#4b5563" stroke-width="4"/>
+                <path d="M30,15 L30,85 M50,15 L50,85 M70,15 L70,85" stroke="#4b5563" stroke-width="4"/>
+                <path d="M10,40 Q50,70 90,40" fill="none" stroke="#9ca3af" stroke-width="3" stroke-dasharray="4,4"/>
+             </svg>`,
+            // ROOM 3: 얽히고설킨 덩굴과 길 (분사의 미로)
+            `<svg width="80" height="80" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px #10b981);">
+                <path d="M10,10 H90 V90 H10 Z M25,25 H75 V75 H25 Z" fill="none" stroke="#059669" stroke-width="3"/>
+                <path d="M40,10 V40 H70 M10,60 H40 V90" fill="none" stroke="#10b981" stroke-width="3"/>
+                <circle cx="50" cy="50" r="5" fill="#f59e0b"/>
+             </svg>`,
+            // ROOM 4: 마법진과 보라색 불꽃 (관용구의 비밀방)
+            `<svg width="80" height="80" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 10px #8b5cf6);">
+                <circle cx="50" cy="50" r="35" fill="none" stroke="#8b5cf6" stroke-width="2"/>
+                <path d="M50,10 L85,70 L15,70 Z" fill="none" stroke="#a78bfa" stroke-width="1.5"/>
+                <path d="M50,90 L15,30 L85,30 Z" fill="none" stroke="#a78bfa" stroke-width="1.5"/>
+                <circle cx="50" cy="50" r="8" fill="#c084fc"/>
+             </svg>`,
+            // ROOM 5: 거대한 해골과 붉은 기운 (마스터의 시련)
+            `<svg width="80" height="80" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 12px #ef4444);">
+                <path d="M30,30 Q50,15 70,30 Q80,50 70,70 H30 Q20,50 30,30 Z" fill="#e5e7eb" stroke="#9ca3af" stroke-width="2"/>
+                <circle cx="42" cy="45" r="6" fill="#000"/>
+                <circle cx="58" cy="45" r="6" fill="#000"/>
+                <path d="M45,55 L50,50 L55,55 Z" fill="#000"/>
+                <path d="M38,70 V75 M44,70 V75 M50,70 V75 M56,70 V75 M62,70 V75" stroke="#000" stroke-width="2"/>
+             </svg>`
+        ];
+
+        // 30문항 데이터셋 고정 유지
+        const masterDataset = [
+            // ROOM 1
+            { id: 1, room: 0, roomName: "ROOM 1. 시작의 방", type: "choice", q: "I enjoy ______ soccer.", options: ["① play", "② playing", "③ played", "④ to played"], ans: 1, exp: "enjoy는 동명사만을 목적으로 취하는 대표적인 동사입니다." },
+            { id: 2, room: 0, roomName: "ROOM 1. 시작의 방", type: "choice", q: "다음 중 문장이 옳은 것은?", options: ["① She likes read books.", "② She likes reading books.", "③ She likes reads books.", "④ She likes to reading books."], ans: 1, exp: "like는 목적어로 동명사(-ing)와 to부정사를 모두 가질 수 있습니다." },
+            { id: 3, room: 0, roomName: "ROOM 1. 시작의 방", type: "short", q: "My hobby is ______ (cook).", ans: "cooking", exp: "is 뒤에서 보어 역할을 수행하는 동명사 형태가 알맞습니다." },
+            { id: 4, room: 0, roomName: "ROOM 1. 시작의 방", type: "choice", q: "다음 중 밑줄 친 부분이 동명사인 것은?", options: ["① I want to sleep.", "② I finished cleaning my room.", "③ I will visit my uncle.", "④ I can swim well."], ans: 1, exp: "finished 뒤의 cleaning은 명사적 목적어로 쓰인 명백한 동명사입니다." },
+            { id: 16, room: 0, roomName: "ROOM 1. 시작의 방", type: "choice", q: "Reading books ______ fun.", options: ["① am", "② is", "③ are", "④ were"], ans: 1, exp: "동명사구 주어는 단수 취급하므로 단수 동사 is가 정답입니다." },
+            // ROOM 2
+            { id: 5, room: 1, roomName: "ROOM 2. 전치사의 감옥", type: "choice", q: "He is good at ______ English.", options: ["① speak", "② speaking", "③ spoke", "④ speaks"], ans: 1, exp: "전치사 at 뒤에는 명사 역할을 하는 동명사(-ing)가 와야 합니다." },
+            { id: 6, room: 1, roomName: "ROOM 2. 전치사의 감옥", type: "choice", q: "Thank you for ______ me.", options: ["① help", "② helping", "③ helped", "④ to help"], ans: 1, exp: "전치사 for 뒤에 동명사 목적어인 helping이 알맞게 결합합니다." },
+            { id: 10, room: 1, roomName: "ROOM 2. 전치사의 감옥", type: "choice", q: "I'm interested in ______ pictures.", options: ["① draw", "② drawing", "③ drew", "④ draws"], ans: 1, exp: "전치사 in 뒤의 목적어로 동명사 drawing이 적절합니다." },
+            { id: 14, room: 1, roomName: "ROOM 2. 전치사의 감옥", type: "choice", q: "다음 중 전치사 뒤에 올 수 있는 형태는?", options: ["① play", "② played", "③ playing", "④ to play"], ans: 2, exp: "전치사 뒤의 목적어 자리에는 명사 역할을 담당하는 동명사만 올 수 있습니다." },
+            { id: 15, room: 1, roomName: "ROOM 2. 전치사의 감옥", type: "choice", q: "She is afraid of ______ mistakes.", options: ["① make", "② making", "③ made", "④ makes"], ans: 1, exp: "전치사 of 뒤에 동명사 목적어인 making이 연결되어야 합니다." },
+            // ROOM 3
+            { id: 8, room: 2, roomName: "ROOM 3. 분사의 미로", type: "choice", q: "다음 중 밑줄 친 부분이 동명사인 것은?", options: ["① I like swimming.", "② The swimming boy is my brother.", "③ I am swimming now.", "④ She is swimming fast."], ans: 0, exp: "①번만 명사적 목적으로 쓰인 동명사이고, 나머지는 분사입니다." },
+            { id: 9, room: 2, roomName: "ROOM 3. 분사의 미로", type: "choice", q: "다음 중 어법상 틀린 것은?", options: ["① I enjoy reading books.", "② He finished doing his homework.", "③ She is interested in painting.", "④ They want going home."], ans: 3, exp: "want는 to부정사만을 목적으로 가지므로 want to go로 교정해야 합니다." },
+            { id: 11, room: 2, roomName: "ROOM 3. 분사의 미로", type: "short", q: "그는 축구하는 것을 좋아한다.\nHe likes ______ soccer.", ans: "playing", exp: "likes 뒤에서 목적어 역할을 수행하는 명사형 변환 동명사 구문입니다." },
+            { id: 17, room: 2, roomName: "ROOM 3. 분사의 미로", type: "choice", q: "다음 중 동명사를 목적어로 취하는 동사는?", options: ["① enjoy", "② want", "③ decide", "④ hope"], ans: 0, exp: "enjoy는 동명사를, 나머지 세 동사는 모두 to부정사를 목적으로 가집니다." },
+            { id: 20, room: 2, roomName: "ROOM 3. 분사의 미로", type: "choice", q: "다음 중 밑줄 친 부분의 쓰임이 다른 하나는?", options: ["① I enjoy reading books.", "② Reading books is fun.", "③ She is good at reading.", "④ She is reading a book now."], ans: 3, exp: "④번만 시제 진행 형태를 나타내는 현재분사로 쓰였습니다." },
+            // ROOM 4
+            { id: 7, room: 3, roomName: "ROOM 4. 관용구의 비밀방", type: "short", q: "She stopped ______ (talk) when the teacher came in.", ans: "talking", exp: "이야기하던 기존 행동을 멈춘 맥락이므로 목적어 명사 역할을 하는 talking이 알맞습니다." },
+            { id: 12, room: 3, roomName: "ROOM 4. 관용구의 비밀방", type: "choice", q: "다음 중 평소 개인의 '취미 활동'을 나타내는 구문은?", options: ["① I enjoy playing baseball.", "② I can play baseball.", "③ I will play baseball tomorrow.", "④ I played baseball yesterday."], ans: 0, exp: "지속성을 내포한 enjoy 구문이 취미 진술에 가장 어울립니다." },
+            { id: 13, room: 3, roomName: "ROOM 4. 관용구의 비밀방", type: "short", q: "They finished ______ (eat) dinner.", ans: "eating", exp: "finish의 고유 목적어 제어 인자는 동명사인 eating입니다." },
+            { id: 18, room: 3, roomName: "ROOM 4. 관용구의 비밀방", type: "short", q: "다음 문장을 바르게 고쳐 쓰시오.\nHe enjoys play basketball.", ans: "He enjoys playing basketball.", exp: "일반동사 뒤에 또 다른 원형 동사가 올 수 없으므로 playing으로 바꿉니다." },
+            { id: 19, room: 3, roomName: "ROOM 4. 관용구의 비밀방", type: "short", q: "I am busy ______ (study) English.", ans: "studying", exp: "be busy -ing (~하느라 바쁘다) 구문 패턴입니다." },
+            // ROOM 5
+            { id: 21, room: 4, roomName: "ROOM 5. 마스터의 시련", type: "choice", q: "다음 두 문장의 빈칸에 공통으로 들어갈 수 있는 단어 형태는?\n\n- He forgot ______ the window, so it's still open now.\n- They decided ______ their project tomorrow.", options: ["① close / submit", "② closing / submitting", "③ to close / to submit", "④ to close / submitting"], ans: 2, exp: "forgot 뒤에 미래에 열어야 할 당위적 사실이 오고, decide는 to부정사만을 취하므로 to형이 공통분모입니다." },
+            { id: 22, room: 4, roomName: "ROOM 5. 마스터의 시련", type: "short", q: "It is no use ______ (cry) over spilt milk.", ans: "crying", exp: "It is no use -ing (~해도 소용없다) 서술형 고난도 숙어 표현입니다." },
+            { id: 23, room: 4, roomName: "ROOM 5. 마스터의 시련", type: "choice", q: "He went to school without eating breakfast.\n= He went to school and ______ breakfast.", options: ["① didn't stop eating", "② did mind eating", "③ didn't eat", "④ was used to eating"], ans: 2, exp: "without -ing(~하지 않은 채)는 절 단위 전환 시 'and didn't 동사원형' 문맥과 완전 일치합니다." },
+            { id: 24, room: 4, roomName: "ROOM 5. 마스터의 시련", type: "short", q: "I look forward to ______ (meet) you soon.", ans: "meeting", exp: "look forward to의 to는 전치사이므로 명사 성격인 동명사 meeting이 결합해야 합니다." },
+            { id: 25, room: 4, roomName: "ROOM 5. 마스터의 시련", type: "choice", q: "다음 중 의미하는 바가 나머지 셋과 다른 구조를 가진 문장은?", options: ["① She remembers locking the door.", "② She doesn't forget locking the door.", "③ She locked the door and she knows it.", "④ She remembers to lock the door."], ans: 3, exp: "④번만 앞으로 잠가야 할 미래 의무를 지칭하며, 다른 선택지는 과거 행동의 기억을 뜻합니다." },
+            { id: 26, room: 4, roomName: "ROOM 5. 마스터의 시련", type: "short", q: "의미상 주어를 포함한 동명사구를 완성하시오. (소유격 기준)\nI don't like ______ ______ (he / make) a noise.", ans: "his making", exp: "동명사 행위의 주체를 명시하는 의미상 주어는 소유격(his)을 배치합니다." },
+            { id: 27, room: 4, roomName: "ROOM 5. 마스터의 시련", type: "choice", q: "밑줄 친 부분의 성격이 문장 성분상 '동명사'로 사용되지 않은 것은?", options: ["① My father's job is collecting old coins.", "② He is busy planning his next vacation.", "③ Keeping a diary everyday is a good habit.", "④ I cannot help laughing at his funny face."], ans: 1, exp: "②번의 busy 구문 뒤 분사는 상태를 나타내는 형용사 분사 계열입니다." },
+            { id: 28, room: 4, roomName: "ROOM 5. 마스터의 시련", type: "short", q: "As soon as she heard the news, she wept.\n= ______ hearing the news, she wept.", ans: "on", exp: "On -ing 구문은 '~하자마자'를 나타내는 고난도 대치 전치사 코드입니다." },
+            { id: 29, room: 4, roomName: "ROOM 5. 마스터의 시련", type: "choice", q: "동사 뒤에 동명사와 to부정사가 모두 올 수 있으며, 의미 변화가 거의 없는 동사 쌍은?", options: ["① stop, forget", "② try, remember", "③ start, begin", "④ regret, mean"], ans: 2, exp: "start, begin은 목적어 종류 변환에 따른 의미 변화가 수반되지 않습니다." },
+            { id: 30, room: 4, roomName: "ROOM 5. 마스터의 시련", type: "short", q: "He denied ______ (steal) the wallet yesterday.", ans: "stealing", exp: "부인하다(deny)의 대상 목적어는 과거 귀속 성격을 가진 동명사(stealing)만 수용합니다." }
+        ];
+
+        let roomData = [[], [], [], [], []];
+        let activeQuestions = [];
+        let wrongQuestions = [];
+        let currentIdx = 0;
+        let score = 0;
+        let isAnswered = false;
+        let currentRoomIdx = 0;
+        
+        let startTime = 0;
+        let totalElapsedTime = "";
+        let currentStudentName = "";
+
+        masterDataset.forEach(item => {
+            roomData[item.room].push(item);
+        });
+
+        function startGame() {
+            const inputField = document.getElementById('startStudentInfo');
+            const info = inputField.value.trim();
+            
+            if(!info) {
+                alert("❗ 학번과 이름을 입력하셔야 하우스 문이 열립니다!");
+                return;
+            }
+            
+            currentStudentName = info;
+            wrongQuestions = [];
+            currentRoomIdx = 0;
+            score = 0;
+            startTime = Date.now();
+            
+            document.getElementById('introScreen').style.display = 'none';
+            document.getElementById('stageMap').style.display = 'flex';
+            document.getElementById('quizContainer').style.display = 'block';
+            
+            setupRoom(0);
+        }
+
+        function setupRoom(roomIdx) {
+            currentRoomIdx = roomIdx;
+            currentIdx = 0;
+            
+            activeQuestions = [...roomData[roomIdx]];
+            activeQuestions.sort(() => Math.random() - 0.5);
+
+            // 🎨 방 테마 색상 및 상단 그래픽 실시간 주입 연출
+            const colors = ["#f59e0b", "#ef4444", "#10b981", "#8b5cf6", "#ec4899"];
+            document.documentElement.style.setProperty('--room-color', colors[roomIdx]);
+            document.getElementById('roomGraphicContent').innerHTML = roomGraphics[roomIdx];
+
+            for (let i = 0; i < 5; i++) {
+                const dot = document.getElementById(`dot${i}`);
+                dot.className = "stage-dot";
+                if (i < roomIdx) dot.classList.add('cleared');
+                if (i === roomIdx) dot.classList.add('active');
+            }
+
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            isAnswered = false;
+            document.getElementById('nextBtn').style.display = 'none';
+            document.getElementById('explanationBox').style.display = 'none';
+            document.getElementById('sadIllustration').style.display = 'none';
+            
+            const currentQuiz = activeQuestions[currentIdx];
+            document.getElementById('roomTitle').innerHTML = `<span>🔑</span> ${currentQuiz.roomName}`;
+            document.getElementById('questionNumText').innerText = `현재 방 자물쇠 해제 현황: ${currentIdx + 1} / ${activeQuestions.length}`;
+            document.getElementById('questionText').innerHTML = currentQuiz.q;
+
+            const area = document.getElementById('interactionArea');
+            area.innerHTML = '';
+
+            if (currentQuiz.type === "choice") {
+                const container = document.createElement('div');
+                container.classList.add('options-container');
+                currentQuiz.options.forEach((opt, idx) => {
+                    const btn = document.createElement('button');
+                    btn.classList.add('option-btn');
+                    btn.innerHTML = opt;
+                    btn.onclick = () => checkAnswer(idx, btn);
+                    container.appendChild(btn);
+                });
+                area.appendChild(container);
+            } else {
+                const container = document.createElement('div');
+                container.classList.add('input-container');
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.classList.add('text-input');
+                input.placeholder = '잠금해제 암호 입력 후 Enter';
+                input.id = 'shortAnswerInput';
+                input.onkeyup = (e) => { if(e.key === 'Enter') checkAnswer(input.value, input); };
+                container.appendChild(input);
+                area.appendChild(container);
+                input.focus();
+            }
+        }
+
+        function checkAnswer(userInput, element) {
+            if (isAnswered) return;
+            isAnswered = true;
+
+            const currentQuiz = activeQuestions[currentIdx];
+            const expBox = document.getElementById('explanationBox');
+            const expTitle = document.getElementById('expTitle');
+            const expText = document.getElementById('expText');
+            const sadImg = document.getElementById('sadIllustration');
+            
+            let isCorrect = false;
+
+            if (currentQuiz.type === "choice") {
+                const btns = document.querySelectorAll('.option-btn');
+                if (userInput === currentQuiz.ans) {
+                    isCorrect = true;
+                    element.classList.add('correct');
+                } else {
+                    element.classList.add('incorrect');
+                    btns[currentQuiz.ans].classList.add('correct');
+                }
+            } else {
+                element.disabled = true;
+                if (userInput.trim().toLowerCase() === currentQuiz.ans.toLowerCase()) {
+                    isCorrect = true;
+                    element.style.borderColor = "var(--success)";
+                    element.style.backgroundColor = "#064e3b";
+                } else {
+                    element.style.borderColor = "var(--error)";
+                    element.style.backgroundColor = "#7f1d1d";
+                }
+            }
+
+            if (isCorrect) {
+                score++;
+                triggerConfetti();
+                expBox.className = "explanation-box correct";
+                expTitle.innerText = "🔓 자물쇠 해제 성공! 단서를 발견했습니다.";
+                sadImg.style.display = 'none';
+            } else {
+                wrongQuestions.push(currentQuiz);
+                expBox.className = "explanation-box incorrect";
+                expTitle.innerText = "💥 함정 발동!";
+                sadImg.style.display = 'block';
+            }
+
+            expText.innerText = currentQuiz.exp;
+            expBox.style.display = 'block';
+
+            const nextBtn = document.getElementById('nextBtn');
+            if (currentRoomIdx === 4 && currentIdx === activeQuestions.length - 1) {
+                nextBtn.innerText = "하우스 최종 탈출 및 기록 제출 🔑";
+                nextBtn.classList.add('escape-btn');
+            } else {
+                nextBtn.innerText = currentIdx === activeQuestions.length - 1 ? "다음 방 문 열기 🚪" : "다음 암호 풀기 ➡️";
+                nextBtn.classList.remove('escape-btn');
+            }
+            nextBtn.style.display = 'block';
+        }
+
+        function triggerConfetti() {
+            const colors = ['#ff007f', '#ffd700', '#00f5ff', '#7fff00', '#6366f1'];
+            for (let i = 0; i < 35; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.left = '50%';
+                confetti.style.top = '40%';
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 160 + 40;
+                confetti.style.setProperty('--x', `${Math.cos(angle) * distance}px`);
+                confetti.style.setProperty('--y', `${Math.sin(angle) * distance}px`);
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 1000);
+            }
+        }
+
+        function nextQuestion() {
+            currentIdx++;
+            if (currentIdx < activeQuestions.length) {
+                loadQuestion();
+            } else {
+                if (currentRoomIdx < 4) {
+                    showRoomClearOverlay();
+                } else {
+                    showFinalResult();
+                }
+            }
+        }
+
+        function showRoomClearOverlay() {
+            const overlay = document.getElementById('clearOverlay');
+            const titles = ["ROOM 1 탈출 완수!", "ROOM 2 감옥 파괴 완료!", "ROOM 3 미로 정복 성공!", "ROOM 4 비밀방 봉인 해제!"];
+            const descs = [
+                "기초 자물쇠들을 무력화했습니다. 그러나 앞에 더 강력한 '전치사의 감옥'이 기다립니다.",
+                "전치사의 규칙을 완벽히 간파하여 철창을 부수었습니다. 차가운 바람과 함께 '분사의 미로'가 눈앞에 나타납니다.",
+                "동명사와 현재분사의 교묘한 위장을 구별해냈군요! 이제 관용구의 비밀방의 문을 엽니다.",
+                "대단합니다! 관용 표현 자물쇠까지 열었습니다. 하지만 마지막 관문인 '마스터의 시련(고난도)'이 펼쳐집니다!"
+            ];
+            
+            document.getElementById('overlayTitle').innerText = titles[currentRoomIdx];
+            document.getElementById('overlayDesc').innerText = descs[currentRoomIdx];
+            overlay.style.display = 'flex';
+        }
+
+        function closeOverlay() {
+            document.getElementById('clearOverlay').style.display = 'none';
+            setupRoom(currentRoomIdx + 1);
+        }
+
+        function showFinalResult() {
+            const endTime = Date.now();
+            const diffSec = Math.floor((endTime - startTime) / 1000);
+            const min = Math.floor(diffSec / 60);
+            const sec = diffSec % 60;
+            totalElapsedTime = `${min}분 ${sec}초`;
+
+            document.getElementById('quizContainer').style.display = 'none';
+            document.getElementById('nextBtn').style.display = 'none';
+            document.getElementById('stageMap').style.display = 'none';
+            
+            const totalQuestions = masterDataset.length;
+            const finalPercent = Math.round((score / totalQuestions) * 100);
+            
+            document.getElementById('scoreText').innerHTML = `
+                플레이어 정보: <b style="color:var(--accent);">${currentStudentName}</b><br>
+                탈출 소요 시간: <span style="color:var(--accent);"><b>${totalElapsedTime}</b></span><br>
+                총 해제 성공 자물쇠: <b>${score}개</b> / ${totalQuestions}개<br>
+                종합 탈출 성공률: <span style="color:var(--accent); font-size:24px;"><b>${finalPercent}%</b></span>
+            `;
+            
+            autoRegisterScore(finalPercent, totalQuestions, diffSec);
+
+            const retryWrongBtn = document.getElementById('retryWrongBtn');
+            if (wrongQuestions.length === 0) {
+                retryWrongBtn.style.display = 'none';
+            } else {
+                retryWrongBtn.style.display = 'inline-block';
+                retryWrongBtn.innerText = `함정(오답) 재탈출하기 (${wrongQuestions.length}문항) 🔄`;
+            }
+            document.getElementById('resultScreen').style.display = 'block';
+        }
+
+        function autoRegisterScore(finalPercent, totalQuestions, diffSec) {
+            let records = JSON.parse(localStorage.getItem('escapeRoomRatings')) || [];
+            
+            records.push({
+                name: currentStudentName,
+                percent: finalPercent,
+                countStr: `${score} / ${totalQuestions}`,
+                timeStr: totalElapsedTime,
+                seconds: diffSec
+            });
+
+            records.sort((a, b) => {
+                if (b.percent !== a.percent) return b.percent - a.percent;
+                return a.seconds - b.seconds;
+            });
+
+            localStorage.setItem('escapeRoomRatings', JSON.stringify(records));
+        }
+
+        function tryAccessDashboard() {
+            const pw = prompt("🔒 교사 인증 비밀번호를 입력하십시오.");
+            if (pw === "1111") {
+                renderLeaderboard();
+                document.getElementById('introScreen').style.display = 'none';
+                document.getElementById('quizContainer').style.display = 'none';
+                document.getElementById('resultScreen').style.display = 'none';
+                document.getElementById('stageMap').style.display = 'none';
+                document.getElementById('teacherDashboard').style.display = 'block';
+            } else if (pw !== null) {
+                alert("❌ 비밀번호가 올바르지 않습니다.");
+            }
+        }
+
+        function renderLeaderboard() {
+            const records = JSON.parse(localStorage.getItem('escapeRoomRatings')) || [];
+            const tbody = document.getElementById('rankTableBody');
+            tbody.innerHTML = '';
+
+            if (records.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="color: var(--text-muted);">등록된 탈출 기록이 없습니다.</td></tr>`;
+                return;
+            }
+
+            records.forEach((rec, idx) => {
+                let medal = idx + 1;
+                if (idx === 0) medal = "🥇";
+                else if (idx === 1) medal = "🥈";
+                else if (idx === 2) medal = "🥉";
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>${medal}</b></td>
+                    <td>${rec.name}</td>
+                    <td style="color:var(--accent); font-weight:bold;">${rec.percent}% (${rec.countStr})</td>
+                    <td>${rec.timeStr}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function clearLeaderboard() {
+            if (confirm("⚠️ 정말로 모든 학생 랭킹 데이터를 초기화하시겠습니까?")) {
+                localStorage.removeItem('escapeRoomRatings');
+                renderLeaderboard();
+            }
+        }
+
+        function closeDashboard() {
+            document.getElementById('teacherDashboard').style.display = 'none';
+            if (!currentStudentName) {
+                document.getElementById('introScreen').style.display = 'block';
+            } else {
+                document.getElementById('resultScreen').style.display = 'block';
+            }
+        }
+
+        function startWrongQuestions() {
+            activeQuestions = [...wrongQuestions];
+            activeQuestions.sort(() => Math.random() - 0.5);
+            wrongQuestions = [];
+            currentIdx = 0;
+            score = 0;
+
+            document.getElementById('roomTitle').innerText = "🔥 패자부활: 비밀 지하 감옥";
+            document.getElementById('questionNumText').innerText = `남은 정복 문항: 1 / ${activeQuestions.length}`;
+            
+            // 패자부활 전용 호러 해골 마크 고정 고정
+            document.getElementById('roomGraphicContent').innerHTML = roomGraphics[4];
+            
+            document.getElementById('stageMap').style.display = 'none';
+            document.getElementById('quizContainer').style.display = 'block';
+            document.getElementById('resultScreen').style.display = 'none';
+            loadQuestion();
+        }
+
+        function restartFullQuiz() {
+            currentStudentName = "";
+            document.getElementById('startStudentInfo').value = "";
+            document.getElementById('stageMap').style.display = 'none';
+            document.getElementById('resultScreen').style.display = 'none';
+            document.getElementById('introScreen').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
